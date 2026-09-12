@@ -162,6 +162,16 @@ deliberate and matches the reference — do not "fix" it by clamping.
    them, and the change then touches corners and nothing else — 441 pixels, all
    within 24px of an artwork corner where the radius is 22px.
 
+   **Gate where it applies, never the distance itself.** The first version of
+   this gate made `cornerDist` return 0 outside the corner box, which put a
+   cliff in the field — and `fwidth` across the quad straddling that cliff came
+   back enormous, widening the ramp until the stage showed through the artwork.
+   One bright pixel row per corner, at `dy = r - 1`: invisible on light artwork,
+   a light hairline arc on dark. Measured before and after: row `dy+19` went
+   `245 241 232 220 196 …` where every neighbouring row read `8 9 8 9 …`. The
+   distance stays continuous (`length(max(r - e, 0))`, the true field); a
+   `step`-gated `mix` decides where the ramp applies.
+
    It is also split into distance and ramp rather than one function, because
    `fwidth` is only defined in uniform control flow and the blur loop runs
    inside `if (radius > 0.5)`, which is per-fragment. Each caller supplies a
@@ -181,8 +191,27 @@ python regression.py --out frames/    # keep what it compared, to look at
 
 It opens with `parse check:` and `load check:` — the two gates from trap 10,
 both of which stop the run outright rather than reporting a diff against a
-half-loaded engine. Then it checks four stages — light, mid, dark, image — and
-prints a line per stage.
+half-loaded engine. Then it checks four stages — light, mid, dark, image — for
+**two artworks**: yours, and a generated near-black one.
+
+**Why both artworks, and why that is still not enough.** A light artwork on a
+light stage cannot show a coverage gap: both sides of the hole are pale. On dark
+artwork the stage shows through as a bright line. But this check compares a flat
+frame against a mid-flip one, so a hole that sits in the same place in both
+cancels out and reads as no difference at all — the corner defect of trap 12
+passed the dark pass too. Hence the last two lines of a run:
+
+```
+holes   flat         0 px of stage showing through the card
+holes   mid          0 px of stage showing through the card
+```
+
+Dark artwork on a **magenta** stage, asserting that no pixel strictly inside the
+rounded card shows any stage colour. The base covers the whole card at every
+angle and the sheet only ever adds to it, so any magenta inside is a gap. It
+asks what is on screen rather than what moved, which is the axis the table
+misses. Verified both ways: the buggy build fails it with 49 pixels and exit 1,
+the fixed build reports 0.
 `UNEXPLAINED 0` everywhere is a pass; anything else is a bug you just wrote.
 `worst ok` is the largest difference the mip slack absorbed: watch it for drift.
 The script loads **one artwork as every design and has no flag to give it two**,

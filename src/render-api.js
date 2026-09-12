@@ -26,6 +26,7 @@ window.RENDER = {
   probe(){ const g = grounding(), st = stageSize();
            return { fill:g.fill, lum:lum(g.fill), lift:g.lift, floor:g.floor,
                     fit:+$('fit').value/100, aspect:st.aspect,
+                    radius:+$('rad').value/1000,
                     auto:st.auto, art:[st.w, st.h], room:st.room }; },
   png(){ return cv.toDataURL('image/png'); }
 };

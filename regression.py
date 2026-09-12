@@ -11,11 +11,24 @@ has to equal the pixel underneath. Only its overhang margin may differ.
     python regression.py my-design.jpg
     python regression.py --out frames/        # keep what it compared
 
-ONE ARTWORK, DELIBERATELY. The script takes a single image and loads it as
-every design, and there is no flag to give it two. Past 90 degrees the sheet
+ONE ARTWORK PER PASS, DELIBERATELY. Each pass loads a single image as every
+design, and there is no flag to give it two. Past 90 degrees the sheet
 legitimately carries the NEXT design, so with two different artworks about a
 quarter of the frame differs for an entirely correct reason and the check tells
 you nothing. This cost a cycle once; it cannot be run wrong now.
+
+EVERY PASS RUNS TWICE: once on your artwork, once on a generated dark one. A
+light artwork on a light stage cannot show a coverage gap - both sides of the
+hole are pale - so a hairline where the sheet exists and the content does not
+is invisible. On dark artwork the stage shows through it as a bright line.
+
+The dark pass is not enough on its own, and that is worth understanding: this
+check compares a flat frame against a mid-flip one, so a hole that sits in the
+same place in both cancels out and reads as no difference at all. A corner
+defect that put a bright row at every corner passed this check on dark artwork
+before the hole test below was added. Hence HOLES: dark artwork on a magenta
+stage, asserting that no pixel strictly inside the card shows any stage colour.
+Different question, different axis - it asks what is on screen, not what moved.
 
 Two gates run before a single pixel is compared, both of them there because the
 engine is nine classic scripts sharing one global scope. A file that fails to
@@ -43,7 +56,7 @@ Three differences are expected and accounted for, everything else fails:
     under this slack, but watch the number for drift.
 """
 
-import argparse, base64, io, pathlib, shutil, subprocess, sys
+import argparse, base64, io, pathlib, shutil, subprocess, sys, tempfile
 
 import numpy as np
 from PIL import Image
@@ -58,6 +71,16 @@ TOLERANCE = 2      # a differing pixel is one off by more than this
 LOD_SLACK = 12     # mip choice between the two sampling paths, out of 255
 WEDGE_AA = 2       # px of anti-aliasing around the overhang margin
 BORDER = 16        # px of the artwork's outer edge, where the two paths differ
+
+
+def dark_artwork(path, w=1620, h=675):
+    """Near-black artwork: any hole in the coverage lights up against the stage."""
+    y, x = np.mgrid[0:h, 0:w]
+    u, v = x / w, y / h
+    img = np.exp(-(((u - .5) / .34) ** 2 + ((v - .62) / .30) ** 2))[..., None] \
+        * np.array([0.42, 0.26, 0.12]) + 0.035
+    Image.fromarray((np.clip(img, 0, 1) * 255).astype("uint8")).save(path)
+    return path
 
 
 def backdrop(w=960, h=600):
@@ -151,6 +174,30 @@ def pick_artwork(given):
     return found[0]
 
 
+def card_mask(probe, w, h, inset=2.0):
+    """The rounded card, eroded a little, in pixels. Nothing inside it may show
+    stage: the base covers the whole shape at every angle, and the sheet only
+    ever adds to it."""
+    hx = probe["fit"]
+    hy = probe["aspect"] * probe["fit"] * w / h
+    x0, x1 = (0.5 - hx / 2) * w, (0.5 + hx / 2) * w
+    y0, y1 = (0.5 - hy / 2) * h, (0.5 + hy / 2) * h
+    r = probe["radius"] * (x1 - x0) / 2          # uRadius is half-artwork-width units
+    y, x = np.mgrid[0:h, 0:w]
+    ex = np.minimum(x - x0, x1 - x)              # distance from the nearest edge
+    ey = np.minimum(y - y0, y1 - y)
+    inside = (ex > inset) & (ey > inset)
+    corner = (ex < r) & (ey < r)                 # inside the corner box: use the arc
+    d = np.hypot(np.maximum(r - ex, 0), np.maximum(r - ey, 0))
+    return inside & (~corner | (d < r - inset))
+
+
+def stage_bleed(frame):
+    """How much magenta stage is showing, per pixel. The dark artwork is warm
+    and neutral, so nothing in it reads as magenta."""
+    return np.clip((frame[..., 0] + frame[..., 2] - 2 * frame[..., 1]) / 510.0, 0, 1)
+
+
 def classify(flat, mid, probe, w, h):
     """-> (row of percentages, count of pixels nothing explains)."""
     diff = np.abs(flat - mid).max(axis=2)
@@ -196,7 +243,9 @@ def main():
 
     from playwright.sync_api import sync_playwright
 
-    print(f"artwork: {art.name}  (loaded as every design)")
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="regress-"))
+    artworks = [("yours", art.resolve()), ("dark", dark_artwork(tmp / "dark.png"))]
+    print(f"artwork: {art.name}, and a generated dark one  (each loaded as every design)")
     print(f"frames:  {w}x{h}, flat vs progress {a.progress}\n")
 
     failures, errors, console = 0, [], []
@@ -213,13 +262,9 @@ def main():
         page.wait_for_function("() => !!window.RENDER", timeout=30_000)
         assert_clean_load(page, errors, console)
         print()
-        print(f"{'stage':<7} {'differing':>10} {'margin+aa':>10} {'outside':>9} "
+        print(f"{'art':<7} {'stage':<7} {'differing':>10} {'margin+aa':>10} {'outside':>9} "
               f"{'border':>8} {'worst ok':>9} {'UNEXPLAINED':>12}")
-        page.set_input_files("#pick", [str(art.resolve())] * 2)   # the same file, twice
-        page.wait_for_function("() => window.__loads >= 1", timeout=120_000)
         page.evaluate("([w,h]) => window.RENDER.size(w,h)", [w, h])
-        for k, v in FLAT.items():
-            apply_set(page, k, v)
 
         def shot(i, p):
             d = page.evaluate(
@@ -227,25 +272,55 @@ def main():
             raw = base64.b64decode(d.split(",", 1)[1])
             return raw, np.asarray(Image.open(io.BytesIO(raw)).convert("RGB")).astype(np.int16)
 
-        for name, build in STAGES:
-            for k, v in build().items():
+        holes = 0
+        for n, (art_name, art_file) in enumerate(artworks, 1):
+            page.set_input_files("#pick", [str(art_file)] * 2)   # the same file, twice
+            page.wait_for_function(f"() => window.__loads >= {n}", timeout=120_000)
+            for k, v in FLAT.items():
                 apply_set(page, k, v)
+            for name, build in STAGES:
+                for k, v in build().items():
+                    apply_set(page, k, v)
+                probe = page.evaluate("() => window.RENDER.probe()")
+                flat_raw, flat = shot(0, 0.0)
+                mid_raw, mid = shot(0, a.progress)
+                if out:
+                    (out / f"{art_name}_{name}_flat.png").write_bytes(flat_raw)
+                    (out / f"{art_name}_{name}_mid.png").write_bytes(mid_raw)
+                row, mask = classify(flat, mid, probe, w, h)
+                failures += row["unexplained"]
+                print(f"{art_name:<7} {name:<7} {row['differing']:9.2f}% {row['margin']:9.2f}% "
+                      f"{row['outside']:8.2f}% {row['border']:7.2f}% {row['worst']:8d}/255"
+                      f" {row['unexplained']:12d}"
+                      f"   (lum {probe['lum']:.3f}, lift {probe['lift']:.2f})")
+                if out and mask.any():
+                    Image.fromarray((mask * 255).astype("uint8")).save(
+                        out / f"{art_name}_{name}_unexplained.png")
+
+            if art_name != "dark":
+                continue
+            # HOLES: a magenta stage under dark artwork. Anything strictly inside
+            # the card that shows magenta is a gap in the coverage - and unlike
+            # the table above, this does not care whether it also moved.
+            apply_set(page, "bgmode", "solid")
+            apply_set(page, "bgcol", "#ff00ff")
             probe = page.evaluate("() => window.RENDER.probe()")
-            flat_raw, flat = shot(0, 0.0)
-            mid_raw, mid = shot(0, a.progress)
-            if out:
-                (out / f"{name}_flat.png").write_bytes(flat_raw)
-                (out / f"{name}_mid.png").write_bytes(mid_raw)
-            row, mask = classify(flat, mid, probe, w, h)
-            failures += row["unexplained"]
-            print(f"{name:<7} {row['differing']:9.2f}% {row['margin']:9.2f}% "
-                  f"{row['outside']:8.2f}% {row['border']:7.2f}% {row['worst']:8d}/255"
-                  f" {row['unexplained']:12d}"
-                  f"   (lum {probe['lum']:.3f}, lift {probe['lift']:.2f})")
-            if out and mask.any():
-                Image.fromarray((mask * 255).astype("uint8")).save(out / f"{name}_unexplained.png")
+            keep = card_mask(probe, w, h)
+            for label, prog in (("flat", 0.0), ("mid", a.progress)):
+                raw, frame = shot(0, prog)
+                bad = (stage_bleed(frame) > 0.15) & keep
+                holes += int(bad.sum())
+                print(f"holes   {label:<7} {bad.sum():6d} px of stage showing through "
+                      f"the card  {'' if not bad.sum() else '  <-- COVERAGE GAP'}")
+                if out:
+                    (out / f"holes_{label}.png").write_bytes(raw)
+                    if bad.any():
+                        Image.fromarray((bad * 255).astype("uint8")).save(
+                            out / f"holes_{label}_mask.png")
+        failures += holes
         br.close()
 
+    shutil.rmtree(tmp, ignore_errors=True)
     if errors or console:
         # anything raised after the load gate, while the stages were driven
         print("\nerrors raised during the run:", (errors + console)[:5])

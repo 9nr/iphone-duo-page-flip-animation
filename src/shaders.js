@@ -12,23 +12,28 @@ const CORNER = `
    should be rounded - the sheet leaves its hinge side square by measuring only
    its free edge.
 
-   Only inside the corner box does the arc apply. length(max(r - e, 0)) - r is
-   the whole rounded-rect distance field, straight edges included - and those
-   edges already have coverage of their own, so using it wholesale double-ramps
-   every edge by a pixel. Reporting 0 outside the box leaves them alone: this
-   changes corners and nothing else.
+   The distance is the true rounded-box field, length(max(r - e, 0)), which is
+   continuous everywhere. That matters more than it looks: a version that
+   reported 0 outside the corner box put a cliff in the distance, and fwidth
+   across the quad straddling that cliff came back enormous, widening the ramp
+   until the stage showed through the artwork - one bright pixel row per corner,
+   invisible on light artwork and a hairline arc on dark. Keep it continuous.
+
+   That field also describes the straight edges, and those already have coverage
+   of their own, so applying it whole double-ramps every edge by a pixel. The
+   corner box gates where it APPLIES, without touching the distance itself.
 
    Split in two because of derivatives. fwidth is only defined in uniform
    control flow, and the blur loop runs inside 'if (radius > 0.5)', which is
-   per-fragment. So the shape is one function, the ramp is another, and each
+   per-fragment. So the distance is one function, the ramp is another, and each
    caller supplies a width it is allowed to compute where it stands. */
 float cornerDist(vec2 e, float r){
-  vec2 k = vec2(r) - e;
-  return (k.x > 0.0 && k.y > 0.0) ? length(k) : 0.0;
+  return length(max(vec2(r) - e, vec2(0.0)));
 }
-float cornerCov(float d, float r, float w){
+float cornerCov(vec2 e, float r, float w){
   if (r <= 0.0001) return 1.0;
-  return 1.0 - smoothstep(r - max(w, 1e-5), r, d);
+  float ramp = 1.0 - smoothstep(r - max(w, 1e-5), r, cornerDist(e, r));
+  return mix(1.0, ramp, step(e.x, r) * step(e.y, r));
 }
 
 /* Distance from the artwork's own four edges, for a sample in artwork uv. */
@@ -112,8 +117,9 @@ void main(){
   // rounded silhouette at mid-flip and reads as a sharp notch. This changes the
   // SHAPE of that boundary only - what falls outside is still the margin, still
   // uEdgeFloor, still blurred into exactly as before.
-  float cd = cornerDist(artEdge(uv, uAspect), uRadius);
-  float covA = cov0.x * cov0.y * cornerCov(cd, uRadius, fwidth(cd));
+  vec2 ce = artEdge(uv, uAspect);
+  float covA = cov0.x * cov0.y
+             * cornerCov(ce, uRadius, fwidth(cornerDist(ce, uRadius)));
   vec3 color = textureLod(uTex, 0.5 + (clamp(uv, vec2(0.0), vec2(1.0)) - 0.5) / uPad, baseLod).rgb
              * covA;
 
@@ -133,8 +139,7 @@ void main(){
         vec2 cv2 = smoothstep(-footprint, footprint, sUV)
                  * (1.0 - smoothstep(vec2(1.0) - footprint, vec2(1.0) + footprint, sUV));
         float w = wx * wy / 256.0;
-        float cc = cv2.x * cv2.y
-                 * cornerCov(cornerDist(artEdge(sUV, uAspect), uRadius), uRadius, soft);
+        float cc = cv2.x * cv2.y * cornerCov(artEdge(sUV, uAspect), uRadius, soft);
         color += textureLod(uTex, 0.5 + (clamp(sUV, vec2(0.0), vec2(1.0)) - 0.5) / uPad, lod).rgb
                * cc * w;
         covA += cc * w;
@@ -172,8 +177,8 @@ void main(){
 
   // round the two OUTER corners only - the hinge side stays square so the
   // two halves still butt together without a notch at the spine
-  float sd = cornerDist(vec2(1.0 - q.x, (0.5 - abs(q.y - 0.5)) * 2.0 * uAspect), uRadius);
-  cov *= cornerCov(sd, uRadius, fwidth(sd));
+  vec2 se = vec2(1.0 - q.x, (0.5 - abs(q.y - 0.5)) * 2.0 * uAspect);
+  cov *= cornerCov(se, uRadius, fwidth(cornerDist(se, uRadius)));
   outColor = vec4(color, cov);
 }`;
 
@@ -196,8 +201,8 @@ void main(){
 
   // round all four corners of the artwork itself, so the sheet and the fixed
   // half share one silhouette instead of the page being the only rounded part
-  float bd = cornerDist(artEdge(uv, uAspect), uRadius);
-  float a = cornerCov(bd, uRadius, fwidth(bd));
+  vec2 be = artEdge(uv, uAspect);
+  float a = cornerCov(be, uRadius, fwidth(cornerDist(be, uRadius)));
   outColor = vec4(c, a);
 }`;
 
