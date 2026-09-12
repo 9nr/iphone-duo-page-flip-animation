@@ -2,6 +2,9 @@
    engine already reads and asks for a redraw. */
 
 SIZES.forEach((s,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=s.label; $('size').appendChild(o); });
+// Auto goes last so the shipped default is still the first preset
+$('size').appendChild(Object.assign(document.createElement('option'),
+  { value:'auto', textContent:'تلقائي  (حسب التصميم)' }));
 
 $('flip').onclick = flip;
 cv.onclick = flip;
@@ -11,7 +14,12 @@ $('scrub').oninput = e => { playing = false; angle = e.target.value/1000*Math.PI
   $(id+'V').textContent = e.target.value + ({dur:'ms',blur:'px',eye:'',dark:'%',crease:'%',stick:'%',light:'%',thick:'',fit:'%',rad:''})[id];
   draw();
 });
-$('size').onchange = e => { SIZE = SIZES[+e.target.value]; resize(); buildPlaceholders(); };
+$('size').onchange = e => {
+  if (e.target.value !== 'auto') SIZE = SIZES[+e.target.value];
+  // rebuilding the placeholders is how a preset change takes effect - but only
+  // when they are what is on the stage. It used to throw real artwork away.
+  if (usingPlaceholders) buildPlaceholders(); else resize();
+};
 // dragging the picker previews the stage immediately; the textures are repadded
 // on release, which is the only expensive half
 $('bgcol').oninput   = () => applyBackground(false);

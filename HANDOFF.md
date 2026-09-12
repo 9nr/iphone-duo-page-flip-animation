@@ -177,7 +177,12 @@ const CURVE  = [...];  // the timing curve, measured off the reference video
 const SIZES  = [...];  // add a row to add a preset; no code branches on size
 const GROUND = {...};  // how the artwork is planted on the stage, as a function
                        // of how light the stage is
+const STAGE  = 16/10;  // the room a PRESET floats in; Auto derives its own
 ```
+
+and one function, `stageSize()` in `src/engine.js`, which is the only place the
+stage's shape is decided. Read the aspect from there, never from `SIZE` — under
+Auto `SIZE` is just the preset the placeholders are drawn at.
 
 All three live in `src/constants.js`. `GROUND` is the newest and the easiest to
 scatter by accident: `lo`/`hi` are the luminance band the grounding crosses over
@@ -266,6 +271,75 @@ colour picker never pops.
 Measured: `#101014` → lum 0.06, lift 1.00, margin 38. `#7d7f7a` → lum 0.50,
 lift 0, margin still pure black. The gradient backdrop → lum 0.26, lift 0.43,
 margin 30.
+
+### 1c. Auto size — DONE
+
+A fourth entry in the size dropdown, after the presets, which keeps their
+behaviour exactly. Under Auto both the artwork's aspect and the room it floats
+in come from the artwork itself — `uAspect` was always a uniform and every
+texture already carries its own `w/h`, so this relaxes a constraint rather than
+adding a path.
+
+**The room.** A portrait design dropped into a 16:10 stage sits tiny in the
+middle between two huge side margins. Auto solves for the stage that leaves the
+same gap above and below the artwork as `fit` leaves at its sides:
+
+```
+artwork width = f·W      margin per side = (1-f)/2·W
+artwork height = a·f·W   H = a·f·W + (1-f)·W
+room = W/H = 1 / (a·f + 1 - f)                     a = artwork h/w
+```
+
+`f` is the fit control's **shipped default, read off the input's `defaultValue`**
+— not its live value, or the stage would reflow while you drag a slider, and not
+a second copy of `62` that could drift. At that default a 2.40:1 panorama lands
+on room 1.566 against the 16:10 it replaces, so Auto and the first preset look
+all but identical on the artwork the presets were chosen for. Measured:
+`3240x1350 → room 1.567`, `1080x1920 → 0.675`, `1500x1500 → 1.000`.
+
+**Mismatched artwork.** One `uAspect` serves every design, so a set that
+disagrees about its shape gets stretched to whichever one wins. It now says so:
+`setDesigns()` compares the aspects, and outside `ASPECT_TOL` (1%) it puts a
+banner above the meta line naming every ratio and which one was adopted (the
+first). It still stretches the rest — it just no longer does it quietly.
+
+**`render.py --size`.** Omitted on a preset it is still `2160x1350`. Omitted on
+an Auto stage it takes the artwork's own pixel width and the height that
+artwork's room implies, so `--set size=auto` is all you need:
+
+```bash
+python render.py portrait1.png portrait2.png --set size=auto   # -> 1080x1600
+```
+
+That renders the artwork at `fit` of its native width; pass `--size` explicitly
+for 1:1. An explicit `--size` always wins. `--size` is read **after** `--set`,
+which is what lets the page be in Auto by the time the stage is asked.
+
+**A preset change no longer destroys loaded artwork.** It used to call
+`buildPlaceholders()` unconditionally; it now only does that when placeholders
+are what is on the stage (`usingPlaceholders`). That was a latent bug, and it is
+also what makes `--set size=` usable from the renderer at all.
+
+### Known: the width-tied units do not follow the aspect
+
+`blur`, `rad` and `thick` are all expressed against the page's width, so the
+same numbers read very differently on a page that is not a wide panorama.
+Nothing here is a bug and the defaults are unchanged — but know what you are
+looking at before re-tuning. Measured at the Auto stage for each aspect:
+
+| artwork | stage | artwork px | corner r | r / page height | edge strip | blur | blur / page width |
+|---|---|---|---|---|---|---|---|
+| 3240×1350 | 3240×2068 | 2010×838 | 40 px | 4.8% | 10.0 px | 93 px | 4.6% |
+| 1080×1920 | 1080×1600 | 670×1192 | 13 px | 1.1% | 3.3 px | 93 px | 13.9% |
+| 1500×1500 | 1500×1500 | 930×930 | 19 px | 2.0% | 4.7 px | 93 px | 10.0% |
+
+`rad` and `thick` are world units where 1 = half the page width, so both shrink
+with a narrower stage; on the portrait the rounded corner is about a fifth of
+its panorama size relative to the page, and the edge strip is a 3 px hairline.
+`blur` is in **source pixels**, so it lands on the same 93 px in all three, which
+is 3× as much of the page on a 1080-wide portrait as on a 3240-wide panorama.
+If these ever need to follow the page, the honest fix is to express them against
+the page's **shorter** side in `stageSize()` — one place, no new branch.
 
 ### 2. Project structure — DONE
 

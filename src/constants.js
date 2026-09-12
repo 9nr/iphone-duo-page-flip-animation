@@ -33,6 +33,11 @@ const SIZES = [
   { label:'1920 × 1080  (1.78:1)', w:1920, h:1080 }
 ];
 
+const STAGE = 16/10;        // the room a PRESET floats in. Auto derives its own;
+                            // see stageSize(). Presets keep this, unchanged.
+
+const ASPECT_TOL = 0.01;    // designs within 1% of each other count as one shape
+
 /* =====================================================================
    GROUNDING, ONE PLACE.
    How the artwork is planted on the stage, as a function of how light the

@@ -10,9 +10,9 @@ window.RENDER = {
     const e = $(k); if (!e) return;
     e.value = v;
     e.dispatchEvent(new Event('input'));
-    // only the background controls do their real work on change; firing it on
-    // #size would throw away the loaded designs
-    if (k === 'bgcol' || k === 'bgmode') e.dispatchEvent(new Event('change'));
+    // these three do their real work on change, not input
+    if (k === 'bgcol' || k === 'bgmode' || k === 'size')
+      e.dispatchEvent(new Event('change'));
   },
   frame(i, p){
     playing = false;
@@ -23,8 +23,9 @@ window.RENDER = {
   count(){ return designs.length; },
   // what the shader is actually using this frame, so a test never has to
   // re-derive it and drift from the engine
-  probe(){ const g = grounding();
+  probe(){ const g = grounding(), st = stageSize();
            return { fill:g.fill, lum:lum(g.fill), lift:g.lift, floor:g.floor,
-                    fit:+$('fit').value/100, aspect:SIZE.h/SIZE.w }; },
+                    fit:+$('fit').value/100, aspect:st.aspect,
+                    auto:st.auto, art:[st.w, st.h], room:st.room }; },
   png(){ return cv.toDataURL('image/png'); }
 };

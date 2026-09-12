@@ -10,7 +10,10 @@ requestAnimationFrame, no dropped frames, no realtime capture.
     python render.py design1.jpg design2.jpg design3.jpg -o book.mp4
 
 Common flags:
-    --size 2160x1350     output resolution (default matches the 16:10 stage)
+    --size 2160x1350     output resolution. Omit it and a preset stage renders
+                         at 2160x1350 as before, while an Auto stage
+                         (--set size=auto) takes the artwork's own pixel width
+                         and the height its own room implies.
     --fps 30
     --flip 3000          milliseconds per flip
     --hold 700           milliseconds resting on each design
@@ -41,7 +44,8 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("designs", nargs="+", help="artwork files, in flip order")
     p.add_argument("-o", "--out", default="page-flip.mp4")
-    p.add_argument("--size", default="2160x1350")
+    p.add_argument("--size", default=None,
+                   help="WxH; omit to let the stage decide (see --set size=auto)")
     p.add_argument("--fps", type=int, default=30)
     p.add_argument("--flip", type=int, default=3000, help="ms per flip")
     p.add_argument("--hold", type=int, default=700, help="ms resting on a design")
@@ -52,6 +56,31 @@ def parse_args():
     p.add_argument("--engine", default=str(ENGINE))
     p.add_argument("--keep-frames", action="store_true")
     return p.parse_args()
+
+
+PRESET_SIZE = (2160, 1350)     # what an omitted --size has always meant
+
+
+def stage_size(page, given):
+    """The output resolution, in the order: what was asked for, what the stage
+    implies, what it has always been.
+
+    An Auto stage has no fixed w/h to copy, so the artwork's own pixel width
+    becomes the stage's and the height follows the room the engine derived for
+    it. That renders the artwork at `fit` of its native width - pass --size
+    explicitly if you want it at 1:1 instead."""
+    if given:
+        w, h = (int(v) for v in given.lower().split("x"))
+    else:
+        probe = page.evaluate("() => window.RENDER.probe()")
+        if probe.get("auto"):
+            w = int(probe["art"][0])
+            h = round(w / probe["room"])
+            print(f"auto stage {w}x{h}  (artwork {probe['art'][0]}x{probe['art'][1]}"
+                  f", room {probe['room']:.3f})")
+        else:
+            w, h = PRESET_SIZE
+    return w - (w % 2), h - (h % 2)          # h264 needs even dimensions
 
 
 def apply_set(page, key, value):
@@ -101,9 +130,6 @@ def main():
         if not pathlib.Path(f).exists():
             sys.exit(f"design not found: {f}")
 
-    w, h = (int(v) for v in a.size.lower().split("x"))
-    w, h = w - (w % 2), h - (h % 2)          # h264 needs even dimensions
-
     from playwright.sync_api import sync_playwright
 
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="flip-"))
@@ -130,6 +156,8 @@ def main():
         for kv in a.set:
             k, _, v = kv.partition("=")
             apply_set(page, k.strip(), v.strip())
+        # after --set, so `--set size=auto` is in effect when the stage is asked
+        w, h = stage_size(page, a.size)
         page.evaluate("([w,h]) => window.RENDER.size(w,h)", [w, h])
 
         timeline = build_timeline(len(files), a.fps, a.flip, a.hold, a.loop)

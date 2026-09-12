@@ -49,6 +49,12 @@ input[type=range]::-moz-range-thumb{
 .sl{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#818974}
 .sl input{width:104px;flex:none;height:7px}
 .sl b{color:#45533b;font-weight:600;font-variant-numeric:tabular-nums;min-width:42px}
+.warn{
+  width:min(1060px,calc(100% - 40px));margin:14px auto 0;
+  padding:10px 16px;border-radius:12px;
+  background:#fdf5e6;border:1px solid #ecd9ae;color:#7a5c1e;
+  font-size:12px;line-height:1.7;text-align:center;
+}
 .meta{font-size:11.5px;color:#8d9484;line-height:1.8;text-align:center;margin-top:14px}
 .meta b{color:#45533b;font-weight:600;font-variant-numeric:tabular-nums}
 .tag{display:inline-block;padding:2px 9px;border-radius:6px;background:#ecefe6;margin-inline-end:6px}

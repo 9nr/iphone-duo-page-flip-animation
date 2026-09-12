@@ -5,6 +5,8 @@ let sources = [];                  // the images themselves, kept so the padded
 let designs = [], idx = 0, angle = 0, playing = false, t0 = 0;  // textures can
 let SIZE = SIZES[0];                                            // be rebuilt
 let userSupplied = false;          // the picker or the harness has spoken
+let usingPlaceholders = true;      // nothing real is loaded, so a size change
+                                   // may rebuild them - see controls.js
 
 function rebuildTextures(){
   if (!sources.length) return;
@@ -24,7 +26,25 @@ function setDesigns(imgs){
   const next = imgs.map(mkTex);
   designs.forEach(d => gl.deleteTexture(d.tex));
   sources = imgs; designs = next;
-  idx = 0; angle = 0; draw();
+  usingPlaceholders = false;
+  idx = 0; angle = 0;
+  reportAspects(imgs);
+  resize();      // not draw(): under Auto the stage itself has just changed shape
+}
+
+// uAspect is one uniform for every design, so a set of artwork that disagrees
+// about its shape gets stretched to whichever one wins. That is survivable, but
+// it must not be silent.
+const ratio = (w, h) => (w/h).toFixed(2) + ':1';
+function reportAspects(imgs){
+  const wh = imgs.map(dims);
+  const a  = wh.map(([w,h]) => w/h);
+  const el = $('warn');
+  if (Math.max(...a) / Math.min(...a) - 1 <= ASPECT_TOL) { el.hidden = true; return; }
+  el.textContent = 'نسب التصاميم غير متطابقة (' + wh.map(([w,h]) => ratio(w,h)).join(' · ')
+                 + ') — اعتُمدت نسبة التصميم الأول ' + ratio(wh[0][0], wh[0][1])
+                 + '، والبقية ستُمدّ لتملأها.';
+  el.hidden = false;
 }
 
 // Open ready. Only works where the images are same-origin - over http, or the
@@ -54,19 +74,55 @@ function loadAssets(){
 
 function buildPlaceholders(){
   designs.forEach(d => gl.deleteTexture(d.tex));
+  // placeholders are drawn at the last chosen preset, so under Auto they are the
+  // artwork: the aspect is that preset's, and the room is derived from it
   sources = [0,1,2].map(i => placeholder(i, SIZE.w, SIZE.h));
   designs = sources.map(mkTex);
-  idx = 0; angle = 0; draw();
+  usingPlaceholders = true;
+  $('warn').hidden = true;
+  idx = 0; angle = 0; resize();
 }
 
-const STAGE = 16/10;                       // the room the artwork floats in
+const dims = s => [s.naturalWidth || s.width, s.naturalHeight || s.height];
+
+/* THE one place the stage's shape comes from.
+
+   A preset is a fixed w/h floating in a fixed 16:10 room. Auto takes both from
+   the artwork itself: uAspect was always a uniform and every texture already
+   carries its own w/h, so this relaxes a constraint rather than adding a path.
+
+   The room: a portrait design inside a 16:10 stage sits tiny in the middle with
+   enormous side margins. Deriving it keeps the margin proportionate instead -
+   solve for the stage that puts the same gap above and below the artwork as the
+   `fit` control leaves at its sides:
+
+       artwork width   = f · W                 margin per side = (1-f)/2 · W
+       artwork height  = a · f · W             H = a·f·W + (1-f)·W
+       room = W/H      = 1 / (a·f + 1 - f)
+
+   f is the fit control's SHIPPED DEFAULT, read off the input, not its live
+   value - the stage should not reflow while you drag a slider, and taking the
+   number from the DOM means there is no second copy of 62 to drift. At that
+   default a 2.40:1 panorama lands on room 1.566, within a hair of the 16:10
+   this replaces, so Auto and the first preset look all but identical on it. */
+function stageSize(){
+  const auto = $('size').value === 'auto';
+  if (!auto || !sources.length)
+    return { auto, w:SIZE.w, h:SIZE.h, aspect:SIZE.h/SIZE.w, room:STAGE };
+  const [w, h] = dims(sources[0]);
+  const aspect = h / w;
+  const f = +$('fit').defaultValue / 100;
+  return { auto, w, h, aspect, room: 1 / (aspect * f + 1 - f) };
+}
+
 let LOCK = null;                           // set by the render harness
 function resize(){
   if (LOCK) { cv.width = LOCK[0]; cv.height = LOCK[1];
               cv.style.width = '100%'; cv.style.height = 'auto'; draw(); return; }
+  const room = stageSize().room;
   const w = cv.clientWidth * Math.max(2, Math.min(devicePixelRatio||1, 2)) * 1.25;
-  cv.width = Math.round(w); cv.height = Math.round(w / STAGE);
-  cv.style.height = (cv.clientWidth / STAGE) + 'px';
+  cv.width = Math.round(w); cv.height = Math.round(w / room);
+  cv.style.height = (cv.clientWidth / room) + 'px';
   draw();
 }
 
@@ -74,7 +130,7 @@ function draw(){
   if (!designs.length) return;
   const A = designs[idx % designs.length];
   const B = designs[(idx+1) % designs.length];
-  const aspect = SIZE.h / SIZE.w;
+  const aspect = stageSize().aspect;
   const eye = +$('eye').value / 100;
   const fit = +$('fit').value / 100;
   const rad = +$('rad').value / 1000;
@@ -198,6 +254,7 @@ function draw(){
   $('mP').textContent = (prog01*100).toFixed(0)+'%';
   $('mF').textContent = back ? 'خلفي' : 'أمامي';
   $('mI').textContent = ((idx % designs.length)+1)+' / '+designs.length;
+  $('mS').textContent = ratio(1, aspect) + (stageSize().auto ? ' · تلقائي' : '');
   $('scrub').value = Math.round(angle/Math.PI*1000);
 }
 
