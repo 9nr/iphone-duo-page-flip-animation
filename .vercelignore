@@ -1,0 +1,13 @@
+# The deploy is the page, its scripts and its artwork. Nothing else ships.
+
+# offline tooling - render.py, regression.py
+*.py
+__pycache__/
+
+# test and render output
+frames/
+*.mp4
+
+# notes and local config
+HANDOFF.md
+.claude/
