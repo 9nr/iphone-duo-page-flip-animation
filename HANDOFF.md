@@ -142,6 +142,13 @@ deliberate and matches the reference — do not "fix" it by clamping.
    error. `window.RENDER` on its own proves nothing — `render-api.js` is its own
    file and comes up fine while the engine underneath it is gone.
 
+11. **The page needs its `<meta charset="utf-8">`.** It is loaded from
+   `file://`, where there are no HTTP headers to say otherwise, so Chrome
+   guesses — and once the UI text became mostly ASCII the guess flipped to
+   Latin-1 and every `×`, `°` and `·` turned into mojibake. The Arabic UI hid
+   this by giving the detector enough to go on. The tag is the fix; do not
+   remove it.
+
 ### The regression test — run this after any change
 
 ```bash
@@ -354,6 +361,35 @@ its panorama size relative to the page, and the edge strip is a 3 px hairline.
 is 3× as much of the page on a 1080-wide portrait as on a 3240-wide panorama.
 If these ever need to follow the page, the honest fix is to express them against
 the page's **shorter** side in `stageSize()` — one place, no new branch.
+
+### 1d. The panel — DONE
+
+Rebuilt to a fixed one-viewport layout: settings down the left, the stage in the
+middle, one pill bar and the readouts underneath. The point is being able to
+watch the stage while dragging a slider — the panel used to sit below it.
+
+- **Nothing knows a stage size.** `resize()` measures the wrapper it was given
+  and fits the room's aspect *inside* that box — contain, never cover — so the
+  stage is never clipped at any window size. `body{overflow:hidden}` and a
+  `100dvh` grid mean the page itself cannot scroll; when the window is too short
+  for the cards, the panel scrolls internally and the stage keeps its space.
+- **Play/pause.** One clock, three ways to move it: `play()`, `pause()` and
+  `seek()`. `held` is how far into a flip we are while stopped, in ms, so
+  resuming and scrubbing mean the same thing to `tick()`. Scrubbing uses
+  `unease()` — the exact inverse of `CURVE`, which is piecewise linear and
+  monotonic — so dropping the playhead at 60% and pressing play carries on from
+  there. Clicking the stage toggles, as before. The big overlay button is a
+  resting-state affordance and hides while it is moving.
+- **Perspective and Lighting left the panel, not the engine.** `#stick` and
+  `#light` are still in the document (hidden, at 0), still read by `draw()`,
+  still settable with `--set stick=` / `--set light=`. Verified: `--set
+  light=60` moves 5% of the frame, `--set stick=50` moves 4%, and putting both
+  back to 0 gives a pixel-identical frame. Delete the inputs and you delete the
+  uniforms' only route in.
+- **The background mode is inferred.** There is no mode dropdown: touching the
+  colour sets `solid`, uploading an image sets `image` (`loadBgImage` already
+  did). `#bgmode` stays in the document for `--set bgmode=`, and `syncBg()`
+  lights whichever of the two is live.
 
 ### 2. Project structure — DONE
 

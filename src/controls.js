@@ -6,12 +6,16 @@ SIZES.forEach((s,i)=>{ const o=document.createElement('option'); o.value=i; o.te
 $('size').appendChild(Object.assign(document.createElement('option'),
   { value:'auto', textContent:'Auto  (from the artwork)' }));
 
-$('flip').onclick = flip;
-cv.onclick = flip;
+$('play').onclick = toggle;
+$('playbig').onclick = toggle;
+cv.onclick = toggle;
 $('reset').onclick = buildPlaceholders;
-$('scrub').oninput = e => { playing = false; angle = e.target.value/1000*Math.PI; draw(); };
+$('scrub').oninput = e => seek(e.target.value / 1000);
+
+// stick and light have no card any more, so no value readout to update either
 ['dur','blur','eye','dark','crease','stick','light','thick','fit','rad'].forEach(id => $(id).oninput = e => {
-  $(id+'V').textContent = e.target.value + ({dur:'ms',blur:'px',eye:'',dark:'%',crease:'%',stick:'%',light:'%',thick:'',fit:'%',rad:''})[id];
+  const out = $(id+'V');
+  if (out) out.textContent = e.target.value + ({dur:'ms',blur:'px',eye:'',dark:'%',crease:'%',stick:'%',light:'%',thick:'',fit:'%',rad:''})[id];
   draw();
 });
 $('size').onchange = e => {
@@ -20,10 +24,19 @@ $('size').onchange = e => {
   // when they are what is on the stage. It used to throw real artwork away.
   if (usingPlaceholders) buildPlaceholders(); else resize();
 };
+
+/* Background. There is no mode dropdown to set any more: touching the colour
+   means you want the colour, and uploading an image means you want the image
+   (loadBgImage flips the mode itself). syncBg then says which one is live. */
+function syncBg(){
+  const image = bgMode() === 'image' && BG.img;
+  $('swatch').classList.toggle('on', !image);
+  $('bgbtn').classList.toggle('on', !!image);
+}
 // dragging the picker previews the stage immediately; the textures are repadded
 // on release, which is the only expensive half
-$('bgcol').oninput   = () => applyBackground(false);
-$('bgcol').onchange  = () => applyBackground(true);
+$('bgcol').oninput   = () => { $('bgmode').value = 'solid'; applyBackground(false); };
+$('bgcol').onchange  = () => { $('bgmode').value = 'solid'; applyBackground(true); };
 $('bgmode').onchange = () => applyBackground(true);
 $('bgpick').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
@@ -41,3 +54,6 @@ $('pick').onchange = e => {
   });
 };
 addEventListener('resize', resize);
+
+syncPlay();
+syncBg();

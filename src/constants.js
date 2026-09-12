@@ -26,6 +26,21 @@ const ease = t => {
   return 1;
 };
 
+/* The curve backwards: what t produces this eased value. CURVE is piecewise
+   linear and monotonic, so this is an exact inverse, not a search. Scrubbing
+   needs it - drop the playhead at 60% and pressing play has to carry on from
+   there rather than from wherever the clock was left. */
+const unease = v => {
+  v = Math.max(0, Math.min(1, v));
+  for (let i = 1; i < CURVE.length; i++) {
+    if (v <= CURVE[i][1]) {
+      const [a, va] = CURVE[i-1], [b, vb] = CURVE[i];
+      return vb === va ? a : a + (b - a) * (v - va) / (vb - va);
+    }
+  }
+  return 1;
+};
+
 /* One list. Add a row, get a new preset - no code branches on size. */
 const SIZES = [
   { label:'3240 × 1350  (2.40:1)', w:3240, h:1350 },

@@ -16,6 +16,7 @@ function rebuildTextures(){
 function applyBackground(rebuild){
   cv.style.background = stageFillCss();
   if (rebuild) rebuildTextures();   // the padding follows the stage, always
+  syncBg();
   draw();
 }
 
@@ -116,13 +117,24 @@ function stageSize(){
 }
 
 let LOCK = null;                           // set by the render harness
+const OVERSAMPLE = Math.max(2, Math.min(devicePixelRatio || 1, 2)) * 1.25;
+
+/* The stage is whatever is left once the panel and the bottom bar have taken
+   what they need, so it is measured rather than assumed: the wrapper is a flex
+   child with min-height 0, and this fits the room's aspect INSIDE that box.
+   Contain, never cover - the stage must not be clipped at any window size. */
 function resize(){
   if (LOCK) { cv.width = LOCK[0]; cv.height = LOCK[1];
               cv.style.width = '100%'; cv.style.height = 'auto'; draw(); return; }
   const room = stageSize().room;
-  const w = cv.clientWidth * Math.max(2, Math.min(devicePixelRatio||1, 2)) * 1.25;
-  cv.width = Math.round(w); cv.height = Math.round(w / room);
-  cv.style.height = (cv.clientWidth / room) + 'px';
+  const box = cv.parentElement.getBoundingClientRect();
+  if (box.width < 2 || box.height < 2) return;      // not laid out yet
+  let w = box.width, h = w / room;
+  if (h > box.height) { h = box.height; w = h * room; }
+  cv.style.width  = Math.round(w) + 'px';
+  cv.style.height = Math.round(h) + 'px';
+  cv.width  = Math.round(w * OVERSAMPLE);
+  cv.height = Math.round(h * OVERSAMPLE);
   draw();
 }
 
@@ -252,18 +264,53 @@ function draw(){
 
   $('mA').textContent = (angle*180/Math.PI).toFixed(1)+'°';
   $('mP').textContent = (prog01*100).toFixed(0)+'%';
-  $('mF').textContent = back ? 'back' : 'front';
+  $('mF').textContent = back ? 'Back' : 'Front';
   $('mI').textContent = ((idx % designs.length)+1)+' / '+designs.length;
   $('mS').textContent = ratio(1, aspect) + (stageSize().auto ? ' · auto' : '');
   $('scrub').value = Math.round(angle/Math.PI*1000);
 }
 
+/* One clock, three ways to move it: play, pause and the scrub handle. `held` is
+   how far into the flip we are while stopped, in milliseconds, so resuming and
+   scrubbing both mean the same thing to tick(). */
+let held = 0;
 function tick(now){
   if (!playing) return;
   const p = Math.min((now - t0) / +$('dur').value, 1);
   angle = ease(p) * Math.PI;
   draw();
   if (p < 1) requestAnimationFrame(tick);
-  else { playing = false; idx = (idx+1) % designs.length; angle = 0; draw(); }
+  else { playing = false; held = 0; idx = (idx+1) % designs.length; angle = 0;
+         draw(); syncPlay(); }
 }
-function flip(){ if (playing) return; playing = true; t0 = performance.now(); requestAnimationFrame(tick); }
+function play(){
+  if (playing || !designs.length) return;
+  playing = true; t0 = performance.now() - held;
+  syncPlay(); requestAnimationFrame(tick);
+}
+function pause(){
+  if (!playing) return;
+  playing = false; held = performance.now() - t0;
+  syncPlay();
+}
+function toggle(){ playing ? pause() : play(); }
+
+// dropping the playhead somewhere has to move the clock with it, or play would
+// jump back to wherever it was left
+function seek(v01){
+  pause();
+  angle = v01 * Math.PI;
+  held  = unease(v01) * +$('dur').value;
+  draw();
+}
+
+// the two play buttons are one state: the big one is a resting-state affordance,
+// so it goes away while the thing is actually moving
+function syncPlay(){
+  const label = playing ? 'Pause' : 'Play';
+  for (const b of [$('play'), $('playbig')]) {
+    b.classList.toggle('is-playing', playing);
+    b.setAttribute('aria-label', label);
+  }
+  $('playbig').hidden = playing;
+}

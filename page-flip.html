@@ -1,55 +1,118 @@
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="src/style.css">
 
-<div class="wrap">
-  <canvas id="stage"></canvas>
-</div>
+<div class="app">
 
-<div class="dock">
-  <div class="bar">
-    <button class="pri" id="flip">Flip page</button>
-    <label class="file">Load designs<input type="file" id="pick" accept="image/*" multiple></label>
-    <select id="size"></select>
-    <button id="reset">Reset</button>
-  </div>
+  <aside class="panel">
+    <h1>Advanced settings</h1>
 
-  <div class="bar">
-    <span style="font-size:11.5px;color:#818974">Background</span>
-    <select id="bgmode">
-      <option value="solid">Colour</option>
-      <option value="image">Image</option>
-    </select>
-    <input type="color" id="bgcol" value="#f6f6f3">
-    <label class="file">Background image<input type="file" id="bgpick" accept="image/*"></label>
-  </div>
+    <div class="cards">
+      <div class="card">
+        <span class="lbl">Background</span>
+        <div class="bg-row">
+          <label class="swatch" id="swatch" title="Stage colour">
+            <input type="color" id="bgcol" value="#f6f6f3">
+          </label>
+          <label class="btn file" id="bgbtn">Upload image
+            <svg class="ico" viewBox="0 0 24 24"><path d="M12 15.5V4m0 0L8 8M12 4l4 4M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/></svg>
+            <input type="file" id="bgpick" accept="image/*">
+          </label>
+        </div>
+      </div>
 
-  <div id="scrubWrap">
-    <span style="font-size:11.5px;color:#818974;white-space:nowrap">Manual</span>
-    <input type="range" id="scrub" min="0" max="1000" value="0">
-  </div>
+      <div class="card">
+        <span class="lbl">Duration</span>
+        <div class="row"><input type="range" id="dur" min="400" max="3000" step="50" value="3000"><b id="durV">3000ms</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Max blur</span>
+        <div class="row"><input type="range" id="blur" min="0" max="160" step="2" value="150"><b id="blurV">150px</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Lens</span>
+        <div class="row"><input type="range" id="eye" min="200" max="2000" step="20" value="560"><b id="eyeV">560</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Darken</span>
+        <div class="row"><input type="range" id="dark" min="0" max="300" step="5" value="250"><b id="darkV">250%</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Sheet thickness</span>
+        <div class="row"><input type="range" id="thick" min="0" max="60" step="1" value="10"><b id="thickV">10</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Scale</span>
+        <div class="row"><input type="range" id="fit" min="30" max="95" step="1" value="62"><b id="fitV">62%</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Corner radius</span>
+        <div class="row"><input type="range" id="rad" min="0" max="80" step="1" value="40"><b id="radV">40</b></div>
+      </div>
+      <div class="card">
+        <span class="lbl">Crease shadow</span>
+        <div class="row"><input type="range" id="crease" min="0" max="100" step="5" value="0"><b id="creaseV">0%</b></div>
+      </div>
+    </div>
 
-  <div class="sliders">
-    <div class="sl">Duration <input type="range" id="dur" min="400" max="3000" step="50" value="3000"><b id="durV">3000ms</b></div>
-    <div class="sl">Max blur <input type="range" id="blur" min="0" max="160" step="2" value="150"><b id="blurV">150px</b></div>
-    <div class="sl">Lens <input type="range" id="eye" min="200" max="2000" step="20" value="560"><b id="eyeV">560</b></div>
-    <div class="sl">Darken <input type="range" id="dark" min="0" max="300" step="5" value="250"><b id="darkV">250%</b></div>
-    <div class="sl">Perspective <input type="range" id="stick" min="0" max="100" step="5" value="0"><b id="stickV">0%</b></div>
-    <div class="sl">Lighting <input type="range" id="light" min="0" max="100" step="5" value="0"><b id="lightV">0%</b></div>
-    <div class="sl">Thickness <input type="range" id="thick" min="0" max="60" step="1" value="10"><b id="thickV">10</b></div>
-    <div class="sl">Size <input type="range" id="fit" min="30" max="95" step="1" value="62"><b id="fitV">62%</b></div>
-    <div class="sl">Corner radius <input type="range" id="rad" min="0" max="80" step="1" value="40"><b id="radV">40</b></div>
-    <div class="sl">Crease shadow <input type="range" id="crease" min="0" max="100" step="5" value="0"><b id="creaseV">0%</b></div>
-  </div>
+    <div class="panel-foot">
+      <button id="reset" class="btn wide">Reset</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="stagewrap">
+      <canvas id="stage"></canvas>
+      <button class="playbig" id="playbig" aria-label="Play">
+        <svg class="ico-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z"/></svg>
+        <svg class="ico-pause" viewBox="0 0 24 24"><rect x="7" y="5.4" width="3.6" height="13.2" rx="1.3"/><rect x="13.4" y="5.4" width="3.6" height="13.2" rx="1.3"/></svg>
+      </button>
+    </div>
+
+    <div class="bottom">
+      <div class="bar">
+        <span class="mini">Artwork size</span>
+        <select id="size" aria-label="Artwork size"></select>
+        <label class="btn file">Upload
+          <svg class="ico" viewBox="0 0 24 24"><path d="M12 15.5V4m0 0L8 8M12 4l4 4M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/></svg>
+          <input type="file" id="pick" accept="image/*" multiple>
+        </label>
+
+        <span class="sep"></span>
+
+        <button class="play" id="play" aria-label="Play">
+          <svg class="ico-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z"/></svg>
+          <svg class="ico-pause" viewBox="0 0 24 24"><rect x="7" y="5.4" width="3.6" height="13.2" rx="1.3"/><rect x="13.4" y="5.4" width="3.6" height="13.2" rx="1.3"/></svg>
+        </button>
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub">
+      </div>
+
+      <div class="meta">
+        <span class="tag">Angle <b id="mA">0.0&deg;</b></span>
+        <span class="tag">Progress <b id="mP">0%</b></span>
+        <span class="tag">Face <b id="mF">Front</b></span>
+        <span class="tag">Design <b id="mI">1 / 3</b></span>
+        <span class="tag">Stage <b id="mS">2.40:1</b></span>
+      </div>
+    </div>
+  </main>
 </div>
 
 <div class="warn" id="warn" hidden></div>
 
-<div class="meta">
-  <span class="tag">Angle <b id="mA">0°</b></span>
-  <span class="tag">Progress <b id="mP">0%</b></span>
-  <span class="tag">Face <b id="mF">front</b></span>
-  <span class="tag">Design <b id="mI">1 / 3</b></span>
-  <span class="tag">Stage <b id="mS">2.40:1</b></span>
+<!-- Retired from the panel, still wired to the shader and still drivable from
+     render.py with --set stick= / --set light=. Both sit at the default the
+     look was chosen with (0), which is why they left the UI - the uniforms and
+     the code paths behind them are untouched. bgmode is here for the same
+     reason: the mode is now inferred from what you touch, but the renderer can
+     still set it outright. -->
+<div hidden>
+  <input type="range" id="stick" min="0" max="100" step="5" value="0">
+  <input type="range" id="light" min="0" max="100" step="5" value="0">
+  <select id="bgmode">
+    <option value="solid">Colour</option>
+    <option value="image">Image</option>
+  </select>
 </div>
 
 <!-- classic scripts, in dependency order, deliberately: ES modules do not load
