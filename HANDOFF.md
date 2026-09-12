@@ -450,11 +450,55 @@ watch the stage while dragging a slider — the panel used to sit below it.
 The split is done (see the file list at the top), `regression.py` is the standing
 check, the artwork loads from `assets/` on startup, and the project is under git.
 
-### 3. Deploy to Vercel
+### 3. Deploy to Vercel — DONE, private
 
-This becomes the interactive version. Behance cannot host it — Behance accepts
-iFrame embeds only from a whitelist of providers — so the plan is: the rendered
-video goes in the Behance project, and a text module links to the live version.
+Production: `https://page-flip-tawny.vercel.app` (project `nader-asaad/page-flip`).
+Static, no build: `vercel.json` turns off framework detection and the build step,
+serves the repo root and rewrites `/` to `page-flip.html`.
+
+- **The artwork is not deployed.** `.vercelignore` keeps `assets/` out, along with
+  the python tooling, `HANDOFF.md` and `.claude/`. On its own that would leave
+  `src/assets.js` naming four files that are not there — four 404s and console
+  errors on every load — so `vercel.json` also rewrites `/src/assets.js` to
+  `src/assets.deploy.js`, an empty list, and `src/assets.js` is ignored so the
+  rewrite applies (Vercel serves a real file before a rewrite). The deploy opens
+  on the placeholders; visitors bring artwork through Upload. Locally nothing
+  changes. The bundle is 15 files, 59 KB.
+- **Excluding a file does not remove it from earlier deploys.** Every deployment
+  keeps its own files. The first one carried the artwork and had to be deleted:
+  `vercel remove <deployment-url>` — the deployment URL, never the project name,
+  which removes the whole project.
+- **Private.** Deployment Protection is `all`: Vercel Authentication in front of
+  every URL, production included. The default, `all_except_custom_domains`,
+  protects preview and deployment URLs but leaves the production `.vercel.app`
+  domain public. Viewing needs a Vercel sign-in with access to the project.
+- **Private means not embeddable.** The login redirect sends
+  `X-Frame-Options: DENY` and the login page `frame-ancestors 'none'`. With the
+  production domain public, the page itself sends neither (checked on the live
+  response) and embeds cleanly in a cross-origin iframe. The Behance plan — the
+  video in the project, a text module linking to the live version — needs the
+  site public again.
+
+```bash
+npx vercel@59.16.0 deploy --prod
+```
+
+```bash
+npx vercel@59.16.0 project protection page-flip
+```
+
+The CLI's `protection` command toggles protection but cannot choose its scope;
+that is a PATCH to the project with `{"ssoProtection":{"deploymentType":"all"}}`
+(or `"all_except_custom_domains"` to make production public again), sent through
+`vercel api` so the CLI's own session authenticates it:
+
+```bash
+MSYS_NO_PATHCONV=1 npx vercel@59.16.0 api /v9/projects/page-flip -X PATCH --input body.json
+```
+
+From Git Bash the `MSYS_NO_PATHCONV=1` is not optional: MSYS rewrites any argument
+starting with `/` into a Windows path, and the CLI then reports an invalid
+endpoint without sending anything.
 
 ### 4. Presentation decisions
 
