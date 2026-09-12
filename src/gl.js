@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 
 const cv = document.getElementById('stage');
 const gl = cv.getContext('webgl2', {antialias:true, premultipliedAlpha:false, preserveDrawingBuffer:true});
-if (!gl) document.body.innerHTML = '<p style="padding:40px">WebGL2 غير مدعوم بهذا المتصفح.</p>';
+if (!gl) document.body.innerHTML = '<p style="padding:40px">WebGL2 is not supported by this browser.</p>';
 
 function prog(vs, fs){
   const c = (t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);

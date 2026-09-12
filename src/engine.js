@@ -41,9 +41,9 @@ function reportAspects(imgs){
   const a  = wh.map(([w,h]) => w/h);
   const el = $('warn');
   if (Math.max(...a) / Math.min(...a) - 1 <= ASPECT_TOL) { el.hidden = true; return; }
-  el.textContent = 'نسب التصاميم غير متطابقة (' + wh.map(([w,h]) => ratio(w,h)).join(' · ')
-                 + ') — اعتُمدت نسبة التصميم الأول ' + ratio(wh[0][0], wh[0][1])
-                 + '، والبقية ستُمدّ لتملأها.';
+  el.textContent = 'These designs do not share one aspect ratio ('
+                 + wh.map(([w,h]) => ratio(w,h)).join(' · ') + '). The first one, '
+                 + ratio(wh[0][0], wh[0][1]) + ', was adopted; the rest are stretched to fill it.';
   el.hidden = false;
 }
 
@@ -252,9 +252,9 @@ function draw(){
 
   $('mA').textContent = (angle*180/Math.PI).toFixed(1)+'°';
   $('mP').textContent = (prog01*100).toFixed(0)+'%';
-  $('mF').textContent = back ? 'خلفي' : 'أمامي';
+  $('mF').textContent = back ? 'back' : 'front';
   $('mI').textContent = ((idx % designs.length)+1)+' / '+designs.length;
-  $('mS').textContent = ratio(1, aspect) + (stageSize().auto ? ' · تلقائي' : '');
+  $('mS').textContent = ratio(1, aspect) + (stageSize().auto ? ' · auto' : '');
   $('scrub').value = Math.round(angle/Math.PI*1000);
 }
 

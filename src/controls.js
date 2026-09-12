@@ -4,7 +4,7 @@
 SIZES.forEach((s,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=s.label; $('size').appendChild(o); });
 // Auto goes last so the shipped default is still the first preset
 $('size').appendChild(Object.assign(document.createElement('option'),
-  { value:'auto', textContent:'تلقائي  (حسب التصميم)' }));
+  { value:'auto', textContent:'Auto  (from the artwork)' }));
 
 $('flip').onclick = flip;
 cv.onclick = flip;
