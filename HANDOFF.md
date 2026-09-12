@@ -149,6 +149,27 @@ deliberate and matches the reference — do not "fix" it by clamping.
    this by giving the detector enough to go on. The tag is the fix; do not
    remove it.
 
+12. **The corner routine is gated to the corner box on purpose.** Three things
+   are rounded by `uRadius`: the sheet's silhouette, the base's silhouette, and
+   the artwork's own boundary inside the sheet (`cov0`). All three go through
+   `cornerDist`/`cornerCov` in `src/shaders.js` — one radius, one shape, no
+   second copy to drift. The gotcha is that `length(max(r - e, 0)) - r` is the
+   *whole* rounded-rectangle distance field, straight edges included, and those
+   edges already have coverage of their own; using it wholesale double-ramps
+   every edge by about a pixel. Measured: 3627 pixels changed, in thin lines
+   along all four straight edges, before the box gate went back in. Reporting 0
+   outside the corner box leaves the straight edges to the coverage that owns
+   them, and the change then touches corners and nothing else — 441 pixels, all
+   within 24px of an artwork corner where the radius is 22px.
+
+   It is also split into distance and ramp rather than one function, because
+   `fwidth` is only defined in uniform control flow and the blur loop runs
+   inside `if (radius > 0.5)`, which is per-fragment. Each caller supplies a
+   width it is allowed to compute where it stands: `fwidth` at the top level,
+   the blur footprint inside the loop. The old inline version called `fwidth`
+   inside `if (ox < uRadius && oy < uRadius)` — non-uniform, and undefined by
+   the spec.
+
 ### The regression test — run this after any change
 
 ```bash
@@ -200,6 +221,10 @@ const GROUND = {...};  // how the artwork is planted on the stage, as a function
                        // of how light the stage is
 const STAGE  = 16/10;  // the room a PRESET floats in; Auto derives its own
 ```
+
+and, in `src/shaders.js`, the `CORNER` snippet — `cornerDist`, `cornerCov` and
+`artEdge` — spliced into both fragment shaders that round anything. One radius,
+one shape; see trap 12.
 
 and one function, `stageSize()` in `src/engine.js`, which is the only place the
 stage's shape is decided. Read the aspect from there, never from `SIZE` — under

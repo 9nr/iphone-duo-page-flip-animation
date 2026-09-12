@@ -1,6 +1,43 @@
 /* Every GLSL program in the engine. The sampling model lives here: read the
    handoff before touching vProj, the padding remap or the coverage maths. */
 
+const CORNER = `
+/* THE rounded corner. One radius, one shape, one routine - the sheet's
+   silhouette, the base's silhouette and the artwork's own boundary inside the
+   sheet all go through this, so they cannot drift apart.
+
+   'e' is the distance from the nearest edge on each axis, in the units uRadius
+   is expressed in: half the artwork width is 1, and the vertical axis carries
+   the aspect so the corner is a circle and not an ellipse. Pass whichever edges
+   should be rounded - the sheet leaves its hinge side square by measuring only
+   its free edge.
+
+   Only inside the corner box does the arc apply. length(max(r - e, 0)) - r is
+   the whole rounded-rect distance field, straight edges included - and those
+   edges already have coverage of their own, so using it wholesale double-ramps
+   every edge by a pixel. Reporting 0 outside the box leaves them alone: this
+   changes corners and nothing else.
+
+   Split in two because of derivatives. fwidth is only defined in uniform
+   control flow, and the blur loop runs inside 'if (radius > 0.5)', which is
+   per-fragment. So the shape is one function, the ramp is another, and each
+   caller supplies a width it is allowed to compute where it stands. */
+float cornerDist(vec2 e, float r){
+  vec2 k = vec2(r) - e;
+  return (k.x > 0.0 && k.y > 0.0) ? length(k) : 0.0;
+}
+float cornerCov(float d, float r, float w){
+  if (r <= 0.0001) return 1.0;
+  return 1.0 - smoothstep(r - max(w, 1e-5), r, d);
+}
+
+/* Distance from the artwork's own four edges, for a sample in artwork uv. */
+vec2 artEdge(vec2 uv, float aspect){
+  return vec2((0.5 - abs(uv.x - 0.5)) * 2.0,
+              (0.5 - abs(uv.y - 0.5)) * 2.0 * aspect);
+}
+`;
+
 const VERT = `#version 300 es
 in vec2 aPos;
 uniform float uAngle, uAspect, uEye, uThick, uFit, uS;
@@ -38,7 +75,7 @@ vec2 toTex(vec2 v){ return 0.5 + (v - 0.5) / uPad; }
 uniform float uStick;     // 0 = pinned to screen, 1 = locked to the sheet
 uniform float uLight, uSheen;
 uniform float uBack;
-
+${CORNER}
 void main(){
   // --- pinned sample (Apple): the intersection of the view ray with z=0
   vec2 uvPin = vProj * 0.5 + 0.5;  uvPin.y = 1.0 - uvPin.y;
@@ -70,13 +107,23 @@ void main(){
   // bleeds softly into that black margin instead of ending on a hard line.
   vec2 aa = max(fwidth(uv), texel * 0.5);
   vec2 cov0 = smoothstep(-aa, aa, uv) * (1.0 - smoothstep(vec2(1.0) - aa, vec2(1.0) + aa, uv));
-  float covA = cov0.x * cov0.y;               // how much artwork this fragment has
+  // The artwork's own boundary is the same rounded rectangle as the card it
+  // belongs to, not a plain rect: a square content corner pokes out of the
+  // rounded silhouette at mid-flip and reads as a sharp notch. This changes the
+  // SHAPE of that boundary only - what falls outside is still the margin, still
+  // uEdgeFloor, still blurred into exactly as before.
+  float cd = cornerDist(artEdge(uv, uAspect), uRadius);
+  float covA = cov0.x * cov0.y * cornerCov(cd, uRadius, fwidth(cd));
   vec3 color = textureLod(uTex, 0.5 + (clamp(uv, vec2(0.0), vec2(1.0)) - 0.5) / uPad, baseLod).rgb
              * covA;
 
   if (radius > 0.5) {
     float lod = max(baseLod, log2(max(1.0, radius)));
     vec2 footprint = max(aa, texel * radius * 0.75);
+    // the corner rides the same footprint as the straight edges, so the whole
+    // boundary softens together instead of the arc staying crisp. uv is
+    // normalised to the artwork, artEdge to half its width, hence the 2.
+    float soft = max(footprint.x, footprint.y * uAspect) * 2.0;
     color = vec3(0.0); covA = 0.0;   // coverage is blurred with the colour, so the
     for (int y = -2; y <= 2; y++){   // margin has to accumulate alongside it
       for (int x = -2; x <= 2; x++){
@@ -86,9 +133,11 @@ void main(){
         vec2 cv2 = smoothstep(-footprint, footprint, sUV)
                  * (1.0 - smoothstep(vec2(1.0) - footprint, vec2(1.0) + footprint, sUV));
         float w = wx * wy / 256.0;
+        float cc = cv2.x * cv2.y
+                 * cornerCov(cornerDist(artEdge(sUV, uAspect), uRadius), uRadius, soft);
         color += textureLod(uTex, 0.5 + (clamp(sUV, vec2(0.0), vec2(1.0)) - 0.5) / uPad, lod).rgb
-               * cv2.x * cv2.y * w;
-        covA += cv2.x * cv2.y * w;
+               * cc * w;
+        covA += cc * w;
       }
     }
   }
@@ -123,15 +172,8 @@ void main(){
 
   // round the two OUTER corners only - the hinge side stays square so the
   // two halves still butt together without a notch at the spine
-  if (uRadius > 0.0001) {
-    float ox = (1.0 - q.x);                                  // world units from the free edge
-    float oy = (0.5 - abs(q.y - 0.5)) * 2.0 * uAspect;        // world units from top/bottom
-    if (ox < uRadius && oy < uRadius) {
-      float dist = length(vec2(uRadius - ox, uRadius - oy));
-      float fw = max(fwidth(dist), 1e-5);
-      cov *= 1.0 - smoothstep(uRadius - fw, uRadius, dist);
-    }
-  }
+  float sd = cornerDist(vec2(1.0 - q.x, (0.5 - abs(q.y - 0.5)) * 2.0 * uAspect), uRadius);
+  cov *= cornerCov(sd, uRadius, fwidth(sd));
   outColor = vec4(color, cov);
 }`;
 
@@ -141,6 +183,7 @@ in vec2 vProj;
 out vec4 outColor;
 uniform sampler2D uA, uB;
 uniform float uShadow, uCrease, uShadowX, uPad, uRadius, uAspect;
+${CORNER}
 void main(){
   vec2 uv = vProj * 0.5 + 0.5;
   uv.y = 1.0 - uv.y;
@@ -153,16 +196,8 @@ void main(){
 
   // round all four corners of the artwork itself, so the sheet and the fixed
   // half share one silhouette instead of the page being the only rounded part
-  float a = 1.0;
-  if (uRadius > 0.0001) {
-    float ex = (0.5 - abs(uv.x - 0.5)) * 2.0;
-    float ey = (0.5 - abs(uv.y - 0.5)) * 2.0 * uAspect;
-    if (ex < uRadius && ey < uRadius) {
-      float dist = length(vec2(uRadius - ex, uRadius - ey));
-      float fw = max(fwidth(dist), 1e-5);
-      a = 1.0 - smoothstep(uRadius - fw, uRadius, dist);
-    }
-  }
+  float bd = cornerDist(artEdge(uv, uAspect), uRadius);
+  float a = cornerCov(bd, uRadius, fwidth(bd));
   outColor = vec4(c, a);
 }`;
 
