@@ -131,6 +131,17 @@ deliberate and matches the reference — do not "fix" it by clamping.
    against a flat one and the margin is expected to differ in both orderings.
    Verify this one by rendering a dark-stage frame and looking at it.
 
+10. **One bad script takes out everything it defines.** The engine is nine
+   classic scripts sharing a single global scope, so a file that fails to parse
+   — or that parses and then throws on the way up — silently removes every
+   function in it, and the symptom surfaces as a missing function somewhere else
+   entirely. An unescaped apostrophe in a string in `engine.js` presented as
+   `buildPlaceholders is not defined`. Both gates at the top of `regression.py`
+   exist for this: `node --check` on every `src/*.js` before the browser starts,
+   and a hard stop if the page reaches `window.RENDER` with any page or console
+   error. `window.RENDER` on its own proves nothing — `render-api.js` is its own
+   file and comes up fine while the engine underneath it is gone.
+
 ### The regression test — run this after any change
 
 ```bash
@@ -140,7 +151,10 @@ python regression.py my-design.jpg
 python regression.py --out frames/    # keep what it compared, to look at
 ```
 
-It checks four stages — light, mid, dark, image — and prints a line per stage.
+It opens with `parse check:` and `load check:` — the two gates from trap 10,
+both of which stop the run outright rather than reporting a diff against a
+half-loaded engine. Then it checks four stages — light, mid, dark, image — and
+prints a line per stage.
 `UNEXPLAINED 0` everywhere is a pass; anything else is a bug you just wrote.
 `worst ok` is the largest difference the mip slack absorbed: watch it for drift.
 The script loads **one artwork as every design and has no flag to give it two**,

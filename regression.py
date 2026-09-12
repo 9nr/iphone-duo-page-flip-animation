@@ -17,6 +17,16 @@ legitimately carries the NEXT design, so with two different artworks about a
 quarter of the frame differs for an entirely correct reason and the check tells
 you nothing. This cost a cycle once; it cannot be run wrong now.
 
+Two gates run before a single pixel is compared, both of them there because the
+engine is nine classic scripts sharing one global scope. A file that fails to
+parse, or that throws on the way up, takes every function it defines with it,
+and what you see is a missing function somewhere else entirely. A diff measured
+against a half-loaded engine means nothing, so neither gate is a warning:
+
+  * every src/*.js goes through `node --check` before the browser starts;
+  * the page must reach window.RENDER with zero page errors and zero console
+    errors, or the run stops there having rendered nothing.
+
 Three differences are expected and accounted for, everything else fails:
 
   * the overhang margin (its colour comes from the engine, not from a guess
@@ -33,7 +43,7 @@ Three differences are expected and accounted for, everything else fails:
     under this slack, but watch the number for drift.
 """
 
-import argparse, base64, io, pathlib, sys
+import argparse, base64, io, pathlib, shutil, subprocess, sys
 
 import numpy as np
 from PIL import Image
@@ -69,6 +79,53 @@ STAGES = [
     ("dark",   lambda: {"bgmode": "solid", "bgcol": "#101014"}),
     ("image",  lambda: {"bgimage": backdrop()}),
 ]
+
+
+def check_syntax(src):
+    """Parse every engine script before a browser is even started.
+
+    node is the nicer diagnostic - it names the file and the line - but it is
+    not the safety net: a parse failure also surfaces as a page error, which the
+    load gate catches. So a machine without node gets a warning, not a stop.
+    """
+    files = sorted(src.glob("*.js"))
+    if not files:
+        return
+    node = shutil.which("node")
+    if not node:
+        print(f"!! node not on PATH - {len(files)} scripts unparsed. The load gate "
+              f"still catches this, with a worse error message.")
+        return
+    bad = []
+    for f in files:
+        r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
+        if r.returncode:
+            bad.append((f.name, (r.stderr or r.stdout).strip()))
+    for name, msg in bad:
+        print(f"SYNTAX ERROR in {name}")
+        print(msg + "\n")
+    if bad:
+        sys.exit(f"{len(bad)} of {len(files)} scripts will not parse. Everything they "
+                 f"define is gone at runtime - fix them before comparing anything.")
+    print(f"parse check: {len(files)} scripts ok")
+
+
+def assert_clean_load(page, page_errors, console_errors):
+    """The engine must come up whole, or the comparison is theatre.
+
+    window.RENDER is not proof of that: render-api.js is its own file, so it can
+    parse and run perfectly well while the engine underneath it is missing.
+    """
+    page.wait_for_timeout(250)          # let a late error arrive before judging
+    if not (page_errors or console_errors):
+        print("load check:  no page or console errors")
+        return
+    for e in page_errors:
+        print("  page error:    " + e)
+    for c in console_errors:
+        print("  console error: " + c)
+    sys.exit("the engine did not load cleanly. Every number below would have been "
+             "measured against a broken page, so nothing was rendered.")
 
 
 def parse_args():
@@ -130,6 +187,8 @@ def classify(flat, mid, probe, w, h):
 def main():
     a = parse_args()
     art = pick_artwork(a.artwork)
+    engine = pathlib.Path(a.engine).resolve()
+    check_syntax(engine.parent / "src")
     w, h = (int(v) for v in a.size.lower().split("x"))
     out = pathlib.Path(a.out) if a.out else None
     if out:
@@ -139,20 +198,23 @@ def main():
 
     print(f"artwork: {art.name}  (loaded as every design)")
     print(f"frames:  {w}x{h}, flat vs progress {a.progress}\n")
-    print(f"{'stage':<7} {'differing':>10} {'margin+aa':>10} {'outside':>9} "
-          f"{'border':>8} {'worst ok':>9} {'UNEXPLAINED':>12}")
 
-    failures, errors = 0, []
+    failures, errors, console = 0, [], []
     with sync_playwright() as pw:
         br = pw.chromium.launch(args=CHROME_ARGS)
         page = br.new_page(viewport={"width": 1400, "height": 1000})
         page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
         # both scripts supply their own designs, so skip the page's startup
         # load of assets/ - it would be work thrown away, and a late resolve
         # racing the picker
         page.add_init_script("window.__noAutoload = true")
-        page.goto(pathlib.Path(a.engine).resolve().as_uri())
+        page.goto(engine.as_uri())
         page.wait_for_function("() => !!window.RENDER", timeout=30_000)
+        assert_clean_load(page, errors, console)
+        print()
+        print(f"{'stage':<7} {'differing':>10} {'margin+aa':>10} {'outside':>9} "
+              f"{'border':>8} {'worst ok':>9} {'UNEXPLAINED':>12}")
         page.set_input_files("#pick", [str(art.resolve())] * 2)   # the same file, twice
         page.wait_for_function("() => window.__loads >= 1", timeout=120_000)
         page.evaluate("([w,h]) => window.RENDER.size(w,h)", [w, h])
@@ -184,8 +246,9 @@ def main():
                 Image.fromarray((mask * 255).astype("uint8")).save(out / f"{name}_unexplained.png")
         br.close()
 
-    if errors:
-        print("\npage errors:", errors[:5])
+    if errors or console:
+        # anything raised after the load gate, while the stages were driven
+        print("\nerrors raised during the run:", (errors + console)[:5])
         return 1
     print("\n" + ("PASS - the sheet is invisible on every stage" if failures == 0
                   else f"FAIL - {failures} pixels nothing explains"))
