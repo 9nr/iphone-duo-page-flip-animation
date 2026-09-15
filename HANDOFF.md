@@ -468,12 +468,14 @@ spaces, hence the slug.
 Static, no build: `vercel.json` turns off framework detection and the build step,
 serves the repo root and rewrites `/` to `page-flip.html`.
 
-- **The default artwork IS deployed; git is what keeps it out.** The live page
-  opens on `assets/day.png` and `assets/night.png`, like the local one.
-  `.vercelignore` keeps out only the python tooling, `HANDOFF.md` and
-  `.claude/`. `assets/` is in `.gitignore`, so the images never reach GitHub -
-  the two ignore files are independent, and the Vercel CLI reads only
-  `.vercelignore` when one exists. For a while the deploy shipped no artwork at
+- **The default artwork is deployed AND in git.** The live page opens on
+  `assets/day.png` and `assets/night.png`, like the local one, and the GitHub
+  repository carries the same two files - GitHub is the same final version as
+  the site, plus the tooling and these notes. `.vercelignore` keeps out only the
+  python tooling, `HANDOFF.md` and `.claude/`. The two ignore files are
+  independent, and the Vercel CLI reads only `.vercelignore` when one exists.
+  Only day/night were ever committed: the four earlier `DT grid` images were
+  removed from the entire history before the first push. For a while the deploy shipped no artwork at
   all (an empty-list rewrite of `src/assets.js`); that opened the public page on
   the placeholders, which is not what anyone previewing it wants.
 - **Excluding a file does not remove it from earlier deploys.** Every deployment

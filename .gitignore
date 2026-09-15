@@ -5,6 +5,3 @@ frames/
 .claude/settings.local.json
 
 .vercel
-
-# the artwork never enters git - it lives on disk and ships nowhere
-assets/
