@@ -13,6 +13,9 @@ video.
 It is built from scratch in raw WebGL2 — no three.js, no framework, no build step.
 The page is plain HTML, CSS and JavaScript that runs from any static host.
 
+It was built with **Claude Opus 5** under the full direction of Nader Asaad — see
+[How it was built](#how-it-was-built).
+
 ---
 
 ## Features
@@ -168,6 +171,20 @@ HANDOFF.md            detailed technical notes
 ```
 
 The site is deployed on Vercel as static files, with `/` serving `page-flip.html`.
+
+---
+
+## How it was built
+
+This project was built using **[Claude Opus 5](https://www.anthropic.com/claude)**,
+Anthropic's AI model, under the full direction of **Nader Asaad**.
+
+Nader directed the work at every step: the iPhone Duo reference, the look and timing
+of the turn, the interface mockup, the default artwork and settings, and what the
+project should and should not do. Each change was reviewed by Nader — including
+spotting defects by eye and sending them back — and Nader decided what shipped.
+Claude Opus 5 implemented that direction in code and tested each change by rendering
+and measuring frames.
 
 ---
 
