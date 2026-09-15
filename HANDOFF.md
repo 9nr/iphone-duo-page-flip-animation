@@ -457,9 +457,14 @@ watch the stage while dragging a slider — the panel used to sit below it.
 The split is done (see the file list at the top), `regression.py` is the standing
 check, the artwork loads from `assets/` on startup, and the project is under git.
 
-### 3. Deploy to Vercel — DONE, private
+### 3. Deploy to Vercel — DONE, public
 
-Production: `https://page-flip-tawny.vercel.app` (project `nader-asaad/page-flip`).
+Production: `https://iphone-duo-page-flip-animation.vercel.app`, project
+`nader-asaad/iphone-duo-page-flip-animation` (renamed from `page-flip`; the old
+`page-flip-tawny.vercel.app` domain still points at the same deployment). The
+page title - the browser tab and link previews - is
+`Iphone Duo - page-flip animation`. Vercel project names cannot hold capitals or
+spaces, hence the slug.
 Static, no build: `vercel.json` turns off framework detection and the build step,
 serves the repo root and rewrites `/` to `page-flip.html`.
 
@@ -475,32 +480,35 @@ serves the repo root and rewrites `/` to `page-flip.html`.
   keeps its own files. The first one carried the artwork and had to be deleted:
   `vercel remove <deployment-url>` — the deployment URL, never the project name,
   which removes the whole project.
-- **Private.** Deployment Protection is `all`: Vercel Authentication in front of
-  every URL, production included. The default, `all_except_custom_domains`,
-  protects preview and deployment URLs but leaves the production `.vercel.app`
-  domain public. Viewing needs a Vercel sign-in with access to the project.
-- **Private means not embeddable.** The login redirect sends
-  `X-Frame-Options: DENY` and the login page `frame-ancestors 'none'`. With the
-  production domain public, the page itself sends neither (checked on the live
-  response) and embeds cleanly in a cross-origin iframe. The Behance plan — the
-  video in the project, a text module linking to the live version — needs the
-  site public again.
+- **Public, with protection OFF - not merely Standard.** `ssoProtection` is
+  `null`. Standard (`all_except_custom_domains`) makes the production domain
+  public but keeps every per-deployment URL behind a Vercel login, and that is
+  the URL the dashboard hands out - copy it and the link looks private to
+  everyone else. With protection off every URL answers 200, and the page sends
+  no `X-Frame-Options` or CSP, so it embeds in a cross-origin iframe (checked).
+  That is what the Behance plan needs: the video in the project, a text module
+  linking here.
+- **The three values.** `null`: everything public. `all_except_custom_domains`:
+  production public, deployment URLs behind login. `all`: everything behind
+  login - and the login page refuses framing (`X-Frame-Options: DENY`,
+  `frame-ancestors 'none'`), so a private site is also not embeddable.
 
 ```bash
 npx vercel@59.16.0 deploy --prod
 ```
 
 ```bash
-npx vercel@59.16.0 project protection page-flip
+npx vercel@59.16.0 project protection iphone-duo-page-flip-animation
 ```
 
 The CLI's `protection` command toggles protection but cannot choose its scope;
-that is a PATCH to the project with `{"ssoProtection":{"deploymentType":"all"}}`
-(or `"all_except_custom_domains"` to make production public again), sent through
-`vercel api` so the CLI's own session authenticates it:
+that is a PATCH to the project with `{"ssoProtection":null}` (public, as now),
+`{"ssoProtection":{"deploymentType":"all"}}` (private) or
+`{"ssoProtection":{"deploymentType":"all_except_custom_domains"}}` (Standard),
+sent through `vercel api` so the CLI's own session authenticates it:
 
 ```bash
-MSYS_NO_PATHCONV=1 npx vercel@59.16.0 api /v9/projects/page-flip -X PATCH --input body.json
+MSYS_NO_PATHCONV=1 npx vercel@59.16.0 api /v9/projects/iphone-duo-page-flip-animation -X PATCH --input body.json
 ```
 
 From Git Bash the `MSYS_NO_PATHCONV=1` is not optional: MSYS rewrites any argument
