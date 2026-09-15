@@ -11,8 +11,3 @@ frames/
 # notes and local config
 HANDOFF.md
 .claude/
-
-# the artwork stays off the deploy. It opens on the placeholders instead, and
-# vercel.json points src/assets.js at an empty list so nothing 404s.
-assets/
-src/assets.js

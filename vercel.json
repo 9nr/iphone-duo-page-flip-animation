@@ -3,7 +3,6 @@
   "buildCommand": null,
   "outputDirectory": ".",
   "rewrites": [
-    { "source": "/", "destination": "/page-flip.html" },
-    { "source": "/src/assets.js", "destination": "/src/assets.deploy.js" }
+    { "source": "/", "destination": "/page-flip.html" }
   ]
 }

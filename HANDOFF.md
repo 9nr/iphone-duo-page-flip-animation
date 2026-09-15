@@ -468,14 +468,14 @@ spaces, hence the slug.
 Static, no build: `vercel.json` turns off framework detection and the build step,
 serves the repo root and rewrites `/` to `page-flip.html`.
 
-- **The artwork is not deployed.** `.vercelignore` keeps `assets/` out, along with
-  the python tooling, `HANDOFF.md` and `.claude/`. On its own that would leave
-  `src/assets.js` naming four files that are not there — four 404s and console
-  errors on every load — so `vercel.json` also rewrites `/src/assets.js` to
-  `src/assets.deploy.js`, an empty list, and `src/assets.js` is ignored so the
-  rewrite applies (Vercel serves a real file before a rewrite). The deploy opens
-  on the placeholders; visitors bring artwork through Upload. Locally nothing
-  changes. The bundle is 15 files, 59 KB.
+- **The default artwork IS deployed; git is what keeps it out.** The live page
+  opens on `assets/day.png` and `assets/night.png`, like the local one.
+  `.vercelignore` keeps out only the python tooling, `HANDOFF.md` and
+  `.claude/`. `assets/` is in `.gitignore`, so the images never reach GitHub -
+  the two ignore files are independent, and the Vercel CLI reads only
+  `.vercelignore` when one exists. For a while the deploy shipped no artwork at
+  all (an empty-list rewrite of `src/assets.js`); that opened the public page on
+  the placeholders, which is not what anyone previewing it wants.
 - **Excluding a file does not remove it from earlier deploys.** Every deployment
   keeps its own files. The first one carried the artwork and had to be deleted:
   `vercel remove <deployment-url>` — the deployment URL, never the project name,
