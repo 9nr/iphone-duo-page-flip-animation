@@ -8,6 +8,8 @@ __pycache__/
 frames/
 *.mp4
 
-# notes and local config
+# notes, the README and its preview media, and local config
 HANDOFF.md
+README.md
+docs/
 .claude/
