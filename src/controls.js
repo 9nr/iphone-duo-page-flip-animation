@@ -2,12 +2,14 @@
    engine already reads and asks for a redraw. */
 
 SIZES.forEach((s,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=s.label; $('size').appendChild(o); });
-// Auto goes last so the shipped default is still the first preset
+// Auto is listed after the presets and selected by default: the default artwork
+// (day/night, 1750x1134, 1.54:1) is no preset's shape, and a preset would stretch
+// it to fit. Auto takes the stage from whatever is loaded.
 $('size').appendChild(Object.assign(document.createElement('option'),
   { value:'auto', textContent:'Auto  (from the artwork)' }));
+$('size').value = 'auto';
 
 $('play').onclick = toggle;
-$('playbig').onclick = toggle;
 cv.onclick = toggle;
 $('reset').onclick = buildPlaceholders;
 $('scrub').oninput = e => seek(e.target.value / 1000);

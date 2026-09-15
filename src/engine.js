@@ -304,13 +304,10 @@ function seek(v01){
   draw();
 }
 
-// the two play buttons are one state: the big one is a resting-state affordance,
-// so it goes away while the thing is actually moving
+// the play button mirrors the clock. Nothing is drawn over the stage: clicking
+// the artwork itself toggles, so the picture is never covered
 function syncPlay(){
-  const label = playing ? 'Pause' : 'Play';
-  for (const b of [$('play'), $('playbig')]) {
-    b.classList.toggle('is-playing', playing);
-    b.setAttribute('aria-label', label);
-  }
-  $('playbig').hidden = playing;
+  const b = $('play');
+  b.classList.toggle('is-playing', playing);
+  b.setAttribute('aria-label', playing ? 'Pause' : 'Play');
 }

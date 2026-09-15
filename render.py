@@ -10,15 +10,15 @@ requestAnimationFrame, no dropped frames, no realtime capture.
     python render.py design1.jpg design2.jpg design3.jpg -o book.mp4
 
 Common flags:
-    --size 2160x1350     output resolution. Omit it and a preset stage renders
-                         at 2160x1350 as before, while an Auto stage
-                         (--set size=auto) takes the artwork's own pixel width
-                         and the height its own room implies.
+    --size 2160x1350     output resolution. Omit it and the stage decides: Auto,
+                         the page's default, takes the artwork's own pixel width
+                         and the height its room implies; a preset
+                         (--set size=0, 1 or 2) renders at 2160x1350.
     --fps 30
     --flip 3000          milliseconds per flip
     --hold 700           milliseconds resting on each design
     --loop               end where it started, so it can play seamlessly
-    --set blur=150 --set rad=40 --set thick=10 --set eye=560 --set fit=62
+    --set blur=150 --set rad=40 --set thick=20 --set eye=560 --set fit=62
 
 Stage background (both reachable the same way):
     --set bgcol=#101014               solid colour

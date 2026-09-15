@@ -5,10 +5,10 @@
    Add a file to assets/ and add its name to this list.
 
    A design whose aspect ratio differs from the selected size preset is
-   stretched to fill it - the preset is the stage, not the file. */
+   stretched to fill it - the preset is the stage, not the file. The page opens
+   on Auto for exactly that reason: these two are 1750x1134 (1.54:1), which is
+   no preset's shape. */
 const ASSETS = [
-  'DT grid 33.png',
-  'DT grid 4.png',
-  'DT grid 6.png',
-  'DT grid 8.png',
+  'day.png',
+  'night.png',
 ];
