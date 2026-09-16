@@ -4,6 +4,18 @@
 <meta property="og:title" content="Iphone Duo - page-flip animation">
 <meta name="twitter:title" content="Iphone Duo - page-flip animation">
 <link rel="stylesheet" href="src/style.css">
+<script>
+  // Vercel Web Analytics. The script only exists where Vercel serves the site,
+  // so it is loaded only there - on file:// or a local server it would 404 and
+  // put an error in the console, which the regression load gate fails on.
+  if (location.hostname.endsWith('.vercel.app')) {
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    const s = document.createElement('script');
+    s.defer = true;
+    s.src = '/_vercel/insights/script.js';
+    document.head.appendChild(s);
+  }
+</script>
 
 <div class="app">
 
