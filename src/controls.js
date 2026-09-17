@@ -11,7 +11,21 @@ $('size').value = 'auto';
 
 $('play').onclick = toggle;
 cv.onclick = toggle;
-$('reset').onclick = buildPlaceholders;
+/* Reset puts the panel back as it shipped - every slider to its default, the
+   stage to its default colour - and leaves the artwork alone. (It used to call
+   buildPlaceholders, which threw the loaded artwork away and touched no
+   setting.) Defaults are read off the inputs, so on a phone Scale returns to
+   the 90 mobile.js gave it, and there is no second copy of any number here. */
+function resetSettings(){
+  document.querySelectorAll('.panel input[type=range]').forEach(el => {
+    el.value = el.defaultValue;
+    el.dispatchEvent(new Event('input'));
+  });
+  $('bgcol').value = $('bgcol').defaultValue;
+  $('bgmode').value = 'solid';
+  applyBackground(true);
+}
+$('reset').onclick = resetSettings;
 $('scrub').oninput = e => seek(e.target.value / 1000);
 
 // stick and light have no card any more, so no value readout to update either
