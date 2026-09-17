@@ -267,8 +267,8 @@ Current defaults (chosen by the user, do not change without asking):
 `dur 3000ms · blur 150 · eye 560 · dark 250% · stick 0% · light 0% ·
 thick 20 · fit 62% · rad 40 · crease 0% · size Auto`
 
-The page opens on **Auto**, because the default artwork (`assets/day.png` and
-`assets/night.png`, 1750x1134, 1.54:1) is no preset's shape and a preset would
+The page opens on **Auto**, because the default artwork (`assets/day.jpg` and
+`assets/night.jpg`, 1750x1134, 1.54:1) is no preset's shape and a preset would
 stretch it by more than half. That also moves `render.py`'s default: with
 `--size` omitted it now renders at the artwork's own width. Pass `--set size=0`
 to get a preset and the old 2160x1350.
@@ -469,7 +469,7 @@ Static, no build: `vercel.json` turns off framework detection and the build step
 serves the repo root and rewrites `/` to `page-flip.html`.
 
 - **The default artwork is deployed AND in git.** The live page opens on
-  `assets/day.png` and `assets/night.png`, like the local one, and the GitHub
+  `assets/day.jpg` and `assets/night.jpg`, like the local one, and the GitHub
   repository carries the same two files - GitHub is the same final version as
   the site, plus the tooling and these notes. `.vercelignore` keeps out only the
   python tooling, `HANDOFF.md` and `.claude/`. The two ignore files are

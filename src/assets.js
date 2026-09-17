@@ -9,6 +9,6 @@
    on Auto for exactly that reason: these two are 1750x1134 (1.54:1), which is
    no preset's shape. */
 const ASSETS = [
-  'day.png',
-  'night.png',
+  'day.jpg',
+  'night.jpg',
 ];

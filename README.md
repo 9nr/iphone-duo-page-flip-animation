@@ -108,7 +108,7 @@ playwright install chromium
 
 ```bash
 # the two default designs, looping back to the first
-python render.py assets/day.png assets/night.png -o book.mp4 --loop
+python render.py assets/day.jpg assets/night.jpg -o book.mp4 --loop
 
 # your own designs, faster turns, on a dark background
 python render.py design1.jpg design2.jpg design3.jpg --flip 2000 --set bgcol=#101014
@@ -163,7 +163,7 @@ src/controls.js       the settings panel
 src/render-api.js     hooks used by render.py and regression.py
 src/style.css         styles
 src/assets.js         the artwork the page opens with
-assets/               default artwork (day.png, night.png)
+assets/               default artwork (day.jpg, night.jpg)
 render.py             video export
 regression.py         the regression check
 vercel.json           static hosting on Vercel

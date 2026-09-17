@@ -40,6 +40,7 @@ body{
   background:var(--card);border:1px solid var(--line);border-radius:22px;
   padding:16px 14px 14px;
 }
+.panel-head{display:flex;justify-content:center}
 .panel h1{
   font-size:13px;font-weight:600;letter-spacing:.01em;text-align:center;
   color:var(--ink);padding-bottom:2px;
@@ -187,3 +188,97 @@ input[type=range]::-moz-range-thumb{
   box-shadow:0 10px 30px -14px #0000004d;
 }
 .warn[hidden]{display:none}
+
+/* phone-only pieces: the sheet's handle and close button, and the button that
+   opens it. The desktop layout never shows them. This sits after .btn on
+   purpose - same specificity, so whichever comes later wins. */
+.sheet-handle,.sheet-close,.settings-open{display:none}
+
+/* ================= phones =================
+   Same page, reshaped. The artwork comes first at full width, the controls sit
+   under it, and the settings panel turns into a sheet that slides up over the
+   bottom half (sideways on a phone held flat) - mobile.js opens it and moves
+   the artwork clear of it, so a slider's effect is always in view. The stage is
+   still measured by resize(), so none of this knows a stage size either. */
+@media (max-width: 760px), (max-height: 520px){
+  .app{
+    display:flex;flex-direction:column;gap:12px;
+    padding:12px 12px max(12px, env(safe-area-inset-bottom));
+  }
+  .side{display:contents}                /* panel and credit join the column */
+  .main{order:1;flex:1 1 auto;gap:12px}
+  .credit{order:2;flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .social{gap:6px}
+  .social a{width:34px;height:34px}
+
+  .stagewrap{transition:transform .34s cubic-bezier(.2,.8,.2,1)}
+  .meta{display:none}                    /* readouts are for tuning, not for a phone */
+  .bottom{gap:10px;align-items:stretch}
+
+  /* the bar: play and scrub on the first line, size and upload on the second */
+  .bar{width:100%;flex-wrap:wrap;gap:10px;border-radius:22px;padding:10px 12px}
+  .bar .mini,.bar .sep{display:none}
+  .play{order:1;width:42px;height:42px}
+  /* the scrub claims the rest of line one, which pushes size and upload down */
+  #scrub{order:2;flex:1 1 calc(100% - 60px);min-width:0;max-width:none}
+  #size{order:3;flex:1 1 0;min-width:0;max-width:none}
+  .bar .file{order:4}
+
+  .settings-open{display:inline-flex;width:100%;padding:12px}
+
+  /* bigger targets for a finger */
+  .btn{font-size:13px;padding:10px 14px}
+  select{font-size:13px;padding:10px 30px 10px 12px}
+  input[type=range]{height:6px}
+  input[type=range]::-webkit-slider-thumb{width:24px;height:24px;border-width:2px}
+  input[type=range]::-moz-range-thumb{width:22px;height:22px}
+  .card{padding:11px 14px 12px}
+  .lbl{font-size:12px}
+  .row b{font-size:12px}
+
+  /* the sheet */
+  .panel{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    height:60dvh;border-radius:24px 24px 0 0;border-bottom:none;
+    padding:6px 14px calc(14px + env(safe-area-inset-bottom));
+    box-shadow:0 -18px 50px -22px #00000059;
+    transform:translateY(105%);visibility:hidden;
+    transition:transform .34s cubic-bezier(.2,.8,.2,1),visibility 0s linear .34s;
+  }
+  .sheet-open .panel{
+    transform:translateY(var(--drag, 0px));visibility:visible;
+    transition:transform .34s cubic-bezier(.2,.8,.2,1),visibility 0s;
+  }
+  .sheet-handle{
+    display:block;flex:0 0 auto;width:40px;height:5px;border-radius:3px;
+    background:#d5d9df;margin:4px auto 2px;
+  }
+  .panel-head{position:relative;align-items:center;min-height:38px;touch-action:none}
+  .sheet-close{
+    display:inline-flex;align-items:center;justify-content:center;
+    position:absolute;right:0;top:50%;transform:translateY(-50%);
+    width:34px;height:34px;border-radius:50%;cursor:pointer;
+    border:1px solid var(--line);background:var(--card);color:var(--muted);
+  }
+}
+
+/* a phone held flat: too short for a sheet from below, so it comes in from the
+   right, and the bar and the settings button share one line */
+@media (max-height: 520px) and (orientation: landscape){
+  .bottom{flex-direction:row;align-items:stretch}
+  .bar{flex:1 1 auto;flex-wrap:nowrap}
+  #scrub{flex:1 1 120px}
+  #size{flex:0 1 180px}
+  .settings-open{width:auto;flex:0 0 auto}
+  .social a{width:30px;height:30px}
+
+  .stagewrap{transition:transform .34s cubic-bezier(.2,.8,.2,1)}
+  .panel{
+    left:auto;top:0;height:auto;width:min(360px, 48vw);
+    border-radius:24px 0 0 24px;border-bottom:1px solid var(--line);border-right:none;
+    padding:10px 14px calc(12px + env(safe-area-inset-bottom));
+    transform:translateX(105%);
+  }
+  .sheet-open .panel{transform:translateX(0)}
+  .sheet-handle{display:none}
+}
